@@ -24,8 +24,15 @@
 
 
 type gen = {
-  structure_gen : Parsetree.type_declaration list  -> bool -> Ast_structure.t ;
-  signature_gen : Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
+  structure_gen :
+    Location.t -> (* the location of derive
+                     [@@bs.deriving{accessors}]
+                     here the `loc` is the location of `accessors`
+                  *)
+    Parsetree.type_declaration list  -> bool -> Ast_structure.t ;
+  signature_gen :
+    Location.t ->
+    Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
   expression_gen : (Parsetree.core_type -> Parsetree.expression) option ; 
 }
 
@@ -50,8 +57,8 @@ let type_deriving_structure
     (explict_nonrec : bool )
   : Ast_structure.t = 
   Ext_list.flat_map
-    (fun action -> 
-       (Ast_payload.table_dispatch !derive_table action).structure_gen 
+    (fun (label_name,_ as action) -> 
+       (Ast_payload.table_dispatch !derive_table action).structure_gen label_name.loc
          tdcls explict_nonrec) actions
 
 let type_deriving_signature
@@ -60,8 +67,9 @@ let type_deriving_signature
     (explict_nonrec : bool )
   : Ast_signature.t = 
   Ext_list.flat_map
-    (fun action -> 
+    (fun (label_name,_ as action) -> 
        (Ast_payload.table_dispatch !derive_table action).signature_gen
+         label_name.loc
          tdcls explict_nonrec) actions
 
 let dispatch_extension ({Asttypes.txt ; loc}) typ =

@@ -24,8 +24,10 @@
 
 
 type gen = {
-  structure_gen : Parsetree.type_declaration list -> bool -> Ast_structure.t ;
-  signature_gen : Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
+  structure_gen :
+    Location.t -> Parsetree.type_declaration list -> bool -> Ast_structure.t ;
+  signature_gen :
+    Location.t -> Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
   expression_gen : (Parsetree.core_type -> Parsetree.expression) option ; 
 }
 

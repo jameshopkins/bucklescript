@@ -91249,8 +91249,10 @@ module Ast_derive : sig
 
 
 type gen = {
-  structure_gen : Parsetree.type_declaration list -> bool -> Ast_structure.t ;
-  signature_gen : Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
+  structure_gen :
+    Location.t -> Parsetree.type_declaration list -> bool -> Ast_structure.t ;
+  signature_gen :
+    Location.t -> Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
   expression_gen : (Parsetree.core_type -> Parsetree.expression) option ; 
 }
 
@@ -91299,8 +91301,15 @@ end = struct
 
 
 type gen = {
-  structure_gen : Parsetree.type_declaration list  -> bool -> Ast_structure.t ;
-  signature_gen : Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
+  structure_gen :
+    Location.t -> (* the location of derive
+                     [@@bs.deriving{accessors}]
+                     here the `loc` is the location of `accessors`
+                  *)
+    Parsetree.type_declaration list  -> bool -> Ast_structure.t ;
+  signature_gen :
+    Location.t ->
+    Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
   expression_gen : (Parsetree.core_type -> Parsetree.expression) option ; 
 }
 
@@ -91325,8 +91334,8 @@ let type_deriving_structure
     (explict_nonrec : bool )
   : Ast_structure.t = 
   Ext_list.flat_map
-    (fun action -> 
-       (Ast_payload.table_dispatch !derive_table action).structure_gen 
+    (fun (label_name,_ as action) -> 
+       (Ast_payload.table_dispatch !derive_table action).structure_gen label_name.loc
          tdcls explict_nonrec) actions
 
 let type_deriving_signature
@@ -91335,8 +91344,9 @@ let type_deriving_signature
     (explict_nonrec : bool )
   : Ast_signature.t = 
   Ext_list.flat_map
-    (fun action -> 
+    (fun (label_name,_ as action) -> 
        (Ast_payload.table_dispatch !derive_table action).signature_gen
+         label_name.loc
          tdcls explict_nonrec) actions
 
 let dispatch_extension ({Asttypes.txt ; loc}) typ =
@@ -91681,7 +91691,7 @@ let init ()  =
         -> Location.raise_errorf ~loc "such configuration is not supported"
       | None -> 
         {Ast_derive.structure_gen = 
-           begin  fun (tdcl  : Parsetree.type_declaration list) explict_nonrec ->
+           begin  fun _dynval_loc (tdcl  : Parsetree.type_declaration list) explict_nonrec ->
              begin match tdcl with 
                | [tdcl] -> 
                  let core_type = Ast_derive_util.core_type_of_type_declaration  tdcl in 
@@ -91756,7 +91766,8 @@ let init ()  =
                exp_of_core_type to_value core_type
              end;
            signature_gen = 
-             begin fun 
+             begin fun
+               _dynval_loc
                (tdcls : Parsetree.type_declaration list)
                (explict_nonrec : bool) -> 
                let handle_tdcl tdcl = 
@@ -91791,7 +91802,9 @@ let init () =
          -> Location.raise_errorf ~loc "such configuration is not supported"
        | None -> 
          {structure_gen = 
-            begin fun (tdcls : Parsetree.type_declaration list) _explict_nonrec ->
+            begin fun
+              accessors_loc
+              (tdcls : Parsetree.type_declaration list) _explict_nonrec ->
               let handle_tdcl tdcl = 
                 let core_type = Ast_derive_util.core_type_of_type_declaration tdcl in 
                 match tdcl with 
@@ -91810,9 +91823,7 @@ let init () =
                            (Exp.field (Exp.ident {txt = Lident txt ; loc}) 
                               {txt = Longident.Lident pld_label ; loc}) ]
                     )
-                | {ptype_kind = 
-                     Ptype_variant constructor_declarations 
-                  } 
+                | {ptype_kind = Ptype_variant constructor_declarations } 
                   -> 
                   constructor_declarations
                   |> 
@@ -91863,14 +91874,33 @@ let init () =
                               ]
                           end
                     )
-                | _ -> []
-                (* Location.raise_errorf "projector only works with record" *)
+                (* | {ptype_kind = Ptype_abstract } -> *)
+                (*   begin match ptype_manifest with *)
+                (*   | Some {ptyp_desc = Ptyp_variant (row_fields, Closed, None) } *)
+                (*     -> *)
+                (*     (\** can not handle such case *)
+                (*         [ a | `b ] *)
+                (*     *\) *)
+                (*     row_fields *)
+                (*     |> *)
+                (*     Ext_list.flat_map (fun (x : Parsetree.row_field) -> *)
+                (*         match x with *)
+                (*         | Rtag (label, _attrs, _amper, args) -> *)
+                (*         | Rinherit _ -> *)
+                (*       ) *)
+                (*   | _ *)
+                (*   end *)
+                | _ ->
+                  begin
+                    Bs_warnings.warn_unused_attribute accessors_loc "accessors" ; 
+                    []
+                  end
+                  
+
               in Ext_list.flat_map handle_tdcl tdcls
-
-
             end;
           signature_gen = 
-            begin fun (tdcls : Parsetree.type_declaration list) _explict_nonrec -> 
+            begin fun accessors_loc (tdcls : Parsetree.type_declaration list) _explict_nonrec -> 
               let handle_tdcl tdcl = 
                 let core_type = Ast_derive_util.core_type_of_type_declaration tdcl in 
                 match tdcl with 
@@ -91906,7 +91936,12 @@ let init () =
                           )
                     )
                            
-                  | _ -> [] 
+                  | _ ->
+                    begin
+                      Bs_warnings.warn_unused_attribute accessors_loc "accessors" ; 
+                      []
+                    end
+
               in 
               Ext_list.flat_map handle_tdcl tdcls
             end;

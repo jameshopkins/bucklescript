@@ -10,7 +10,9 @@ let init () =
          -> Location.raise_errorf ~loc "such configuration is not supported"
        | None -> 
          {structure_gen = 
-            begin fun (tdcls : Parsetree.type_declaration list) _explict_nonrec ->
+            begin fun
+              accessors_loc
+              (tdcls : Parsetree.type_declaration list) _explict_nonrec ->
               let handle_tdcl tdcl = 
                 let core_type = Ast_derive_util.core_type_of_type_declaration tdcl in 
                 match tdcl with 
@@ -29,9 +31,7 @@ let init () =
                            (Exp.field (Exp.ident {txt = Lident txt ; loc}) 
                               {txt = Longident.Lident pld_label ; loc}) ]
                     )
-                | {ptype_kind = 
-                     Ptype_variant constructor_declarations 
-                  } 
+                | {ptype_kind = Ptype_variant constructor_declarations } 
                   -> 
                   constructor_declarations
                   |> 
@@ -82,14 +82,33 @@ let init () =
                               ]
                           end
                     )
-                | _ -> []
-                (* Location.raise_errorf "projector only works with record" *)
+                (* | {ptype_kind = Ptype_abstract } -> *)
+                (*   begin match ptype_manifest with *)
+                (*   | Some {ptyp_desc = Ptyp_variant (row_fields, Closed, None) } *)
+                (*     -> *)
+                (*     (\** can not handle such case *)
+                (*         [ a | `b ] *)
+                (*     *\) *)
+                (*     row_fields *)
+                (*     |> *)
+                (*     Ext_list.flat_map (fun (x : Parsetree.row_field) -> *)
+                (*         match x with *)
+                (*         | Rtag (label, _attrs, _amper, args) -> *)
+                (*         | Rinherit _ -> *)
+                (*       ) *)
+                (*   | _ *)
+                (*   end *)
+                | _ ->
+                  begin
+                    Bs_warnings.warn_unused_attribute accessors_loc "accessors" ; 
+                    []
+                  end
+                  
+
               in Ext_list.flat_map handle_tdcl tdcls
-
-
             end;
           signature_gen = 
-            begin fun (tdcls : Parsetree.type_declaration list) _explict_nonrec -> 
+            begin fun accessors_loc (tdcls : Parsetree.type_declaration list) _explict_nonrec -> 
               let handle_tdcl tdcl = 
                 let core_type = Ast_derive_util.core_type_of_type_declaration tdcl in 
                 match tdcl with 
@@ -125,7 +144,12 @@ let init () =
                           )
                     )
                            
-                  | _ -> [] 
+                  | _ ->
+                    begin
+                      Bs_warnings.warn_unused_attribute accessors_loc "accessors" ; 
+                      []
+                    end
+
               in 
               Ext_list.flat_map handle_tdcl tdcls
             end;

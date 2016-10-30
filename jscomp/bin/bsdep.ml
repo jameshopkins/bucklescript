@@ -26478,8 +26478,10 @@ module Ast_derive : sig
 
 
 type gen = {
-  structure_gen : Parsetree.type_declaration list -> bool -> Ast_structure.t ;
-  signature_gen : Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
+  structure_gen :
+    Location.t -> Parsetree.type_declaration list -> bool -> Ast_structure.t ;
+  signature_gen :
+    Location.t -> Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
   expression_gen : (Parsetree.core_type -> Parsetree.expression) option ; 
 }
 
@@ -26528,8 +26530,15 @@ end = struct
 
 
 type gen = {
-  structure_gen : Parsetree.type_declaration list  -> bool -> Ast_structure.t ;
-  signature_gen : Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
+  structure_gen :
+    Location.t -> (* the location of derive
+                     [@@bs.deriving{accessors}]
+                     here the `loc` is the location of `accessors`
+                  *)
+    Parsetree.type_declaration list  -> bool -> Ast_structure.t ;
+  signature_gen :
+    Location.t ->
+    Parsetree.type_declaration list -> bool -> Ast_signature.t ; 
   expression_gen : (Parsetree.core_type -> Parsetree.expression) option ; 
 }
 
@@ -26554,8 +26563,8 @@ let type_deriving_structure
     (explict_nonrec : bool )
   : Ast_structure.t = 
   Ext_list.flat_map
-    (fun action -> 
-       (Ast_payload.table_dispatch !derive_table action).structure_gen 
+    (fun (label_name,_ as action) -> 
+       (Ast_payload.table_dispatch !derive_table action).structure_gen label_name.loc
          tdcls explict_nonrec) actions
 
 let type_deriving_signature
@@ -26564,8 +26573,9 @@ let type_deriving_signature
     (explict_nonrec : bool )
   : Ast_signature.t = 
   Ext_list.flat_map
-    (fun action -> 
+    (fun (label_name,_ as action) -> 
        (Ast_payload.table_dispatch !derive_table action).signature_gen
+         label_name.loc
          tdcls explict_nonrec) actions
 
 let dispatch_extension ({Asttypes.txt ; loc}) typ =
@@ -26910,7 +26920,7 @@ let init ()  =
         -> Location.raise_errorf ~loc "such configuration is not supported"
       | None -> 
         {Ast_derive.structure_gen = 
-           begin  fun (tdcl  : Parsetree.type_declaration list) explict_nonrec ->
+           begin  fun _dynval_loc (tdcl  : Parsetree.type_declaration list) explict_nonrec ->
              begin match tdcl with 
                | [tdcl] -> 
                  let core_type = Ast_derive_util.core_type_of_type_declaration  tdcl in 
@@ -26985,7 +26995,8 @@ let init ()  =
                exp_of_core_type to_value core_type
              end;
            signature_gen = 
-             begin fun 
+             begin fun
+               _dynval_loc
                (tdcls : Parsetree.type_declaration list)
                (explict_nonrec : bool) -> 
                let handle_tdcl tdcl = 
@@ -27000,6 +27011,110 @@ let init ()  =
 
          }
      end
+
+end
+module Bs_warnings : sig 
+#1 "bs_warnings.mli"
+(* Copyright (C) 2015-2016 Bloomberg Finance L.P.
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * In addition to the permissions granted to you by the LGPL, you may combine
+ * or link a "work that uses the Library" with a publicly distributed version
+ * of this file to produce a combined library or application, then distribute
+ * that combined work under the terms of your choosing, with no requirement
+ * to comply with the obligations normally placed on you by section 4 of the
+ * LGPL version 3 (or the corresponding section of a later version of the LGPL
+ * should you choose to use a later version).
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. *)
+
+
+type t = 
+  | Unsafe_ffi_bool_type
+  | Unsafe_poly_variant_type
+
+(* val print_string_warning : Location.t -> string -> unit *)
+
+val prerr_warning : Location.t -> t -> unit
+
+(**It will always warn not relevant to whether {!Js_config.warn_unused_attribute} set or not
+   User should check it first. 
+   The reason is that we will do a global check first, then start warning later
+*)
+val warn_unused_attribute : Location.t -> string -> unit
+
+end = struct
+#1 "bs_warnings.ml"
+(* Copyright (C) 2015-2016 Bloomberg Finance L.P.
+ * 
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * In addition to the permissions granted to you by the LGPL, you may combine
+ * or link a "work that uses the Library" with a publicly distributed version
+ * of this file to produce a combined library or application, then distribute
+ * that combined work under the terms of your choosing, with no requirement
+ * to comply with the obligations normally placed on you by section 4 of the
+ * LGPL version 3 (or the corresponding section of a later version of the LGPL
+ * should you choose to use a later version).
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. *)
+
+
+
+type t = 
+  | Unsafe_ffi_bool_type
+
+  | Unsafe_poly_variant_type
+  (* for users write code like this:
+     {[ external f : [`a of int ] -> string = ""]}
+     Here users forget about `[@bs.string]` or `[@bs.int]`
+  *)    
+
+
+
+let to_string t =
+  match t with
+  | Unsafe_ffi_bool_type
+    ->   
+    "You are passing a OCaml bool type into JS, probabaly you want to pass Js.boolean"
+  | Unsafe_poly_variant_type 
+    -> 
+    "Here a OCaml polymorphic variant type passed into JS, probably you forgot annotations like `[@bs.int]` or `[@bs.string]`  "
+
+let warning_formatter = Format.err_formatter
+
+let print_string_warning loc x = 
+  Location.print warning_formatter loc ; 
+  Format.pp_print_string warning_formatter "Warning: ";
+  Format.pp_print_string warning_formatter x
+
+let prerr_warning loc x =
+  if not (!Js_config.no_warn_ffi_type ) then
+    print_string_warning loc (to_string x) 
+
+let warn_unused_attribute loc txt =
+  print_string_warning loc ("Unused attribute " ^ txt ^ " \n" )
 
 end
 module Ast_derive_projector : sig 
@@ -27020,7 +27135,9 @@ let init () =
          -> Location.raise_errorf ~loc "such configuration is not supported"
        | None -> 
          {structure_gen = 
-            begin fun (tdcls : Parsetree.type_declaration list) _explict_nonrec ->
+            begin fun
+              accessors_loc
+              (tdcls : Parsetree.type_declaration list) _explict_nonrec ->
               let handle_tdcl tdcl = 
                 let core_type = Ast_derive_util.core_type_of_type_declaration tdcl in 
                 match tdcl with 
@@ -27039,9 +27156,7 @@ let init () =
                            (Exp.field (Exp.ident {txt = Lident txt ; loc}) 
                               {txt = Longident.Lident pld_label ; loc}) ]
                     )
-                | {ptype_kind = 
-                     Ptype_variant constructor_declarations 
-                  } 
+                | {ptype_kind = Ptype_variant constructor_declarations } 
                   -> 
                   constructor_declarations
                   |> 
@@ -27092,14 +27207,33 @@ let init () =
                               ]
                           end
                     )
-                | _ -> []
-                (* Location.raise_errorf "projector only works with record" *)
+                (* | {ptype_kind = Ptype_abstract } -> *)
+                (*   begin match ptype_manifest with *)
+                (*   | Some {ptyp_desc = Ptyp_variant (row_fields, Closed, None) } *)
+                (*     -> *)
+                (*     (\** can not handle such case *)
+                (*         [ a | `b ] *)
+                (*     *\) *)
+                (*     row_fields *)
+                (*     |> *)
+                (*     Ext_list.flat_map (fun (x : Parsetree.row_field) -> *)
+                (*         match x with *)
+                (*         | Rtag (label, _attrs, _amper, args) -> *)
+                (*         | Rinherit _ -> *)
+                (*       ) *)
+                (*   | _ *)
+                (*   end *)
+                | _ ->
+                  begin
+                    Bs_warnings.warn_unused_attribute accessors_loc "accessors" ; 
+                    []
+                  end
+                  
+
               in Ext_list.flat_map handle_tdcl tdcls
-
-
             end;
           signature_gen = 
-            begin fun (tdcls : Parsetree.type_declaration list) _explict_nonrec -> 
+            begin fun accessors_loc (tdcls : Parsetree.type_declaration list) _explict_nonrec -> 
               let handle_tdcl tdcl = 
                 let core_type = Ast_derive_util.core_type_of_type_declaration tdcl in 
                 match tdcl with 
@@ -27135,7 +27269,12 @@ let init () =
                           )
                     )
                            
-                  | _ -> [] 
+                  | _ ->
+                    begin
+                      Bs_warnings.warn_unused_attribute accessors_loc "accessors" ; 
+                      []
+                    end
+
               in 
               Ext_list.flat_map handle_tdcl tdcls
             end;
@@ -27397,110 +27536,6 @@ let merge (l: t) (r : t) =
     {loc_start ;loc_end; loc_ghost = false}
 
 let none = Location.none
-
-end
-module Bs_warnings : sig 
-#1 "bs_warnings.mli"
-(* Copyright (C) 2015-2016 Bloomberg Finance L.P.
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * In addition to the permissions granted to you by the LGPL, you may combine
- * or link a "work that uses the Library" with a publicly distributed version
- * of this file to produce a combined library or application, then distribute
- * that combined work under the terms of your choosing, with no requirement
- * to comply with the obligations normally placed on you by section 4 of the
- * LGPL version 3 (or the corresponding section of a later version of the LGPL
- * should you choose to use a later version).
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. *)
-
-
-type t = 
-  | Unsafe_ffi_bool_type
-  | Unsafe_poly_variant_type
-
-(* val print_string_warning : Location.t -> string -> unit *)
-
-val prerr_warning : Location.t -> t -> unit
-
-(**It will always warn not relevant to whether {!Js_config.warn_unused_attribute} set or not
-   User should check it first. 
-   The reason is that we will do a global check first, then start warning later
-*)
-val warn_unused_attribute : Location.t -> string -> unit
-
-end = struct
-#1 "bs_warnings.ml"
-(* Copyright (C) 2015-2016 Bloomberg Finance L.P.
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * In addition to the permissions granted to you by the LGPL, you may combine
- * or link a "work that uses the Library" with a publicly distributed version
- * of this file to produce a combined library or application, then distribute
- * that combined work under the terms of your choosing, with no requirement
- * to comply with the obligations normally placed on you by section 4 of the
- * LGPL version 3 (or the corresponding section of a later version of the LGPL
- * should you choose to use a later version).
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- * 
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA. *)
-
-
-
-type t = 
-  | Unsafe_ffi_bool_type
-
-  | Unsafe_poly_variant_type
-  (* for users write code like this:
-     {[ external f : [`a of int ] -> string = ""]}
-     Here users forget about `[@bs.string]` or `[@bs.int]`
-  *)    
-
-
-
-let to_string t =
-  match t with
-  | Unsafe_ffi_bool_type
-    ->   
-    "You are passing a OCaml bool type into JS, probabaly you want to pass Js.boolean"
-  | Unsafe_poly_variant_type 
-    -> 
-    "Here a OCaml polymorphic variant type passed into JS, probably you forgot annotations like `[@bs.int]` or `[@bs.string]`  "
-
-let warning_formatter = Format.err_formatter
-
-let print_string_warning loc x = 
-  Location.print warning_formatter loc ; 
-  Format.pp_print_string warning_formatter "Warning: ";
-  Format.pp_print_string warning_formatter x
-
-let prerr_warning loc x =
-  if not (!Js_config.no_warn_ffi_type ) then
-    print_string_warning loc (to_string x) 
-
-let warn_unused_attribute loc txt =
-  print_string_warning loc ("Unused attribute " ^ txt ^ " \n" )
 
 end
 module Lam_methname : sig 

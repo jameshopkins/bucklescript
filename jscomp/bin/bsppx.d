@@ -41,12 +41,6 @@ bsppx.ml : syntax/ast_derive.mli
 bsppx.ml : syntax/ast_derive_util.ml
 bsppx.ml : syntax/ast_derive_dyn.ml
 bsppx.ml : syntax/ast_derive_dyn.mli
-bsppx.ml : syntax/ast_derive_projector.ml
-bsppx.ml : syntax/ast_derive_projector.mli
-bsppx.ml : syntax/ast_core_type.ml
-bsppx.ml : syntax/ast_core_type.mli
-bsppx.ml : common/bs_loc.ml
-bsppx.ml : common/bs_loc.mli
 bsppx.ml : ext/ext_pervasives.ml
 bsppx.ml : ext/ext_pervasives.mli
 bsppx.ml : ext/ext_filename.ml
@@ -55,6 +49,12 @@ bsppx.ml : common/js_config.ml
 bsppx.ml : common/js_config.mli
 bsppx.ml : common/bs_warnings.ml
 bsppx.ml : common/bs_warnings.mli
+bsppx.ml : syntax/ast_derive_projector.ml
+bsppx.ml : syntax/ast_derive_projector.mli
+bsppx.ml : syntax/ast_core_type.ml
+bsppx.ml : syntax/ast_core_type.mli
+bsppx.ml : common/bs_loc.ml
+bsppx.ml : common/bs_loc.mli
 bsppx.ml : common/lam_methname.ml
 bsppx.ml : common/lam_methname.mli
 bsppx.ml : syntax/ast_external_attributes.ml

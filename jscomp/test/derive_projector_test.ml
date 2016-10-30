@@ -27,6 +27,7 @@ and e = { d : d }
 
 
 
+  
 let v = d  @@ { d = d_int  3 }
 
 let g = u_X 
@@ -39,3 +40,12 @@ let h = [
   newContent "3"
 ]
 
+type 'a poly =
+  [ `poly_hi of string  | `Poly_hi of 'a  | `poly_lo of int ]
+  [@@bs.deriving {accessors}]
+
+(* let polys : int poly list  = *)
+(*   [ *)
+(*     poly_lo 3; *)
+(*     poly_hi 3 *)
+(*   ] *)

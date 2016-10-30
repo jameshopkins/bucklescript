@@ -79,14 +79,14 @@ bsdep.ml : syntax/ast_derive.mli
 bsdep.ml : syntax/ast_derive_util.ml
 bsdep.ml : syntax/ast_derive_dyn.ml
 bsdep.ml : syntax/ast_derive_dyn.mli
+bsdep.ml : common/bs_warnings.ml
+bsdep.ml : common/bs_warnings.mli
 bsdep.ml : syntax/ast_derive_projector.ml
 bsdep.ml : syntax/ast_derive_projector.mli
 bsdep.ml : syntax/ast_core_type.ml
 bsdep.ml : syntax/ast_core_type.mli
 bsdep.ml : common/bs_loc.ml
 bsdep.ml : common/bs_loc.mli
-bsdep.ml : common/bs_warnings.ml
-bsdep.ml : common/bs_warnings.mli
 bsdep.ml : common/lam_methname.ml
 bsdep.ml : common/lam_methname.mli
 bsdep.ml : syntax/ast_external_attributes.ml

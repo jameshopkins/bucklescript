@@ -257,7 +257,7 @@ let init ()  =
         -> Location.raise_errorf ~loc "such configuration is not supported"
       | None -> 
         {Ast_derive.structure_gen = 
-           begin  fun (tdcl  : Parsetree.type_declaration list) explict_nonrec ->
+           begin  fun _dynval_loc (tdcl  : Parsetree.type_declaration list) explict_nonrec ->
              begin match tdcl with 
                | [tdcl] -> 
                  let core_type = Ast_derive_util.core_type_of_type_declaration  tdcl in 
@@ -332,7 +332,8 @@ let init ()  =
                exp_of_core_type to_value core_type
              end;
            signature_gen = 
-             begin fun 
+             begin fun
+               _dynval_loc
                (tdcls : Parsetree.type_declaration list)
                (explict_nonrec : bool) -> 
                let handle_tdcl tdcl = 

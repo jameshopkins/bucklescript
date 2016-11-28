@@ -18,6 +18,8 @@ S ounit
 B ounit
 S ounit_tests
 B ounit_tests
+B others
+S others
 
 B +compiler-libs
 FLG -w -40-30

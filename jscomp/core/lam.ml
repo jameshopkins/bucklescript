@@ -1140,9 +1140,64 @@ let lam_prim ~primitive:( p : Lambda.primitive) ~args loc  : t =
 
 
 type bindings = (Ident.t * t) list
+
+(* TODO: 
+    1. [bindings list] is not enough: even for single binding we need tell which one 
+    is single recursive or not 
+    2. We need improve the order, move functions in the beginning -- partition?
+*)
+(*
+
+let scc_bindings  (groups :  bindings)  
+    (lam : t)
+    (body : t) : bindings list 
+  =     
+  begin match groups with 
+    | [ _ ] ->
+       [groups]
+    (* single binding, it does not make sense to do scc,
+       we can eliminate {[ let rec f x = x + x  ]}, but it happens rarely in real world 
+     *)
+    | _ ->    
+      let domain : _ Ordered_hash_map_local_ident.t = 
+        Ordered_hash_map_local_ident.create 3 in 
+      List.iter (fun (x,lam) -> Ordered_hash_map_local_ident.add domain x lam) groups ;
+      let int_mapping = Ordered_hash_map_local_ident.to_sorted_array domain in 
+      let node_vec = Array.make (Array.length int_mapping) (Int_vec.empty ()) in
+      Ordered_hash_map_local_ident.iter ( fun id lam key_index ->        
+          let base_key =  node_vec.(key_index) in 
+          let free_vars = free_variables lam in
+          Ident_set.iter (fun x ->
+              let key = Ordered_hash_map_local_ident.rank domain x in 
+              if key >= 0 then 
+                Int_vec.push key base_key 
+            ) free_vars
+        ) domain;
+      let clusters = Ext_scc.graph node_vec in 
+      if Int_vec_vec.length clusters <= 1 then [groups]
+      else          
+        Int_vec_vec.fold_right (fun  (v : Int_vec.t) acc ->
+            let bindings =
+              Int_vec.map_into_list (fun i -> 
+                  let id = int_mapping.(i) in 
+                  let lam  = Ordered_hash_map_local_ident.find_value domain  id in  
+                  (id,lam)
+                ) v  in 
+            match bindings with 
+            | [ id,(Lfunction _ as lam) ] ->
+              let base_key = Ordered_hash_map_local_ident.rank domain id in          
+
+              if  Int_vec.exists (fun (x : int) -> x = base_key)  node_vec.(base_key) then 
+                bindings :: acc 
+              else  id lam acc    
+            | _ ->  
+              letrec bindings  acc 
+          )  clusters body 
+  end
+*)
 let scc  (groups :  bindings)  
     (lam : t)
-    (body : t)
+    (body : t) : t 
   =     
   begin match groups with 
     | [ _ ] ->
